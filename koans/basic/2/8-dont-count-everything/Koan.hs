@@ -1,15 +1,13 @@
 {-# LANGUAGE Arrows #-}
 
-{- | Don't count everything.
-
-Arrow notation can have case expressions, and also if-then-else syntax.
-You can use it to conditionally execute an effectful stream function.
--}
+-- | Don't count everything.
+--
+-- Arrow notation can have case expressions, and also if-then-else syntax.
+-- You can use it to conditionally execute an effectful stream function.
 module Koan where
 
 -- text
 import Data.Text qualified as Text (length, words)
-
 -- rhine
 import FRP.Rhine hiding (currentInput)
 
@@ -26,7 +24,7 @@ printAllCounts = proc () -> do
   totalCharCount <- sumN -< charCount
 
   -- Only trigger the then-branch on every 1000th line!
-  if _
+  if lineCount `mod` 1000 == 0
     then do
       arrMCl print -< lineCount
       arrMCl print -< totalWordCount
