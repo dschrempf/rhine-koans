@@ -1,27 +1,24 @@
-{- | Count the all the chars!
-
-If we can count words, we surely can count characters as well.
-But how do we output them _both_?
-
-'ClSF's have an instance for the 'Arrow' type class.
-This means that they can be composed sequentially (as you did already with '>>>'),
-but also in parallel.
-Let's look at one combinator that allows this:
-
-@
-(&&&) :: Monad m => ClSF m cl a b -> ClSF m cl a c -> ClSF m cl a (b, c)
-@
-
-If two signal functions are on the same monad, the same clock, and receive the same input,
-we can combine them in parallel and execute both after each other.
-Both outputs are combined in a tuple.
--}
+-- | Count the all the chars!
+--
+-- If we can count words, we surely can count characters as well. But how do we
+-- output them _both_?
+--
+-- 'ClSF's have an instance for the 'Arrow' type class. This means that they can be
+-- composed sequentially (as you did already with '>>>'), but also in parallel.
+-- Let's look at one combinator that allows this:
+--
+-- @
+-- (&&&) :: Monad m => ClSF m cl a b -> ClSF m cl a c -> ClSF m cl a (b, c)
+-- @
+--
+-- If two signal functions are on the same monad, the same clock, and receive the
+-- same input, we can combine them in parallel and execute both after each other.
+-- Both outputs are combined in a tuple.
 module Koan where
 
 -- text
 import Data.Text (Text)
 import Data.Text qualified as Text (length, words)
-
 -- rhine
 import FRP.Rhine hiding (currentInput)
 
@@ -33,11 +30,10 @@ userInput = tagS
 wordCount :: ClSF IO StdinClock () Int
 wordCount = userInput >-> arr (Text.words >>> length)
 
-{- | Output the number of characters of the line that was just entered.
-
-The newline character is not part of 'userInput',
-therefore +1 is added for it.
--}
+-- | Output the number of characters of the line that was just entered.
+--
+-- The newline character is not part of 'userInput',
+-- therefore +1 is added for it.
 charCount :: ClSF IO StdinClock () Int
 -- Yes, you can use >>> to compose ordinary functions as well!
 charCount = userInput >-> arr (Text.length >>> (+ 1))
@@ -48,10 +44,8 @@ sumClSF = feedback 0 $ arr aggregator
   where
     aggregator :: (Num a) => (a, a) -> (a, a)
     aggregator (currentInput, currentSum) =
-      let
-        nextSum = currentInput + currentSum
-       in
-        (nextSum, nextSum)
+      let nextSum = currentInput + currentSum
+       in (nextSum, nextSum)
 
 -- | The number of words of input so far.
 totalWordCount :: ClSF IO StdinClock () Int
@@ -60,11 +54,11 @@ totalWordCount = wordCount >-> sumClSF
 -- | The number of characters of input so far.
 totalCharCount :: ClSF IO StdinClock () Int
 -- Reuse your sum utility!
-totalCharCount = charCount >-> _
+totalCharCount = charCount >-> sumClSF
 
 -- | The number of total words and characters so far.
 totalWordAndCharCount :: ClSF IO StdinClock () (Int, Int)
-totalWordAndCharCount = _ &&& _
+totalWordAndCharCount = totalWordCount &&& totalCharCount
 
 -- | Print the number of total words and characters so far.
 printAllCounts :: ClSF IO StdinClock () ()
