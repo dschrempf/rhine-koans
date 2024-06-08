@@ -1,36 +1,31 @@
 {-# LANGUAGE Arrows #-}
 
-{- | State.
-
-So we have a handle on exceptions.
-Nevertheless, once the exception occurs, even if we handle it gracefully, the current word count is gone.
-Let's fix that!
-
-Continuing to use the koan as a console application,
-we want to output the final word count of a text file at the end,
-as well as an intermediate count every 1000 lines.
--}
+-- | State.
+--
+-- So we have a handle on exceptions. Nevertheless, once the exception occurs, even
+-- if we handle it gracefully, the current word count is gone. Let's fix that!
+--
+-- Continuing to use the koan as a console application, we want to output the final
+-- word count of a text file at the end, as well as an intermediate count every
+-- 1000 lines.
 module Koan where
 
 -- base
-import Control.Exception qualified as Exception ()
-
+import Control.Exception qualified as Exception (try)
 -- transformers
-import Control.Monad.Trans.Class ()
-import Control.Monad.Trans.State.Strict (StateT (runStateT))
-
+import Control.Monad.Trans.Class (MonadTrans (..))
+import Control.Monad.Trans.State.Strict (StateT (runStateT), get, put)
 -- text
 import Data.Text qualified as Text (length, words)
-
 -- rhine
 import FRP.Rhine hiding (get, put)
 
-{- | The monad of effects for this application, consisting of state and exceptions.
-
-Note: It's important that 'StateT' is the inner transformer.
-After all, we want to keep the final state after the exception has been thrown.
-(Changing the order would discard the state upon an exception.)
--}
+-- | The monad of effects for this application, consisting of state and
+-- exceptions.
+--
+-- Note: It's important that 'StateT' is the inner transformer. After all, we
+-- want to keep the final state after the exception has been thrown. (Changing
+-- the order would discard the state upon an exception.)
 type App = ExceptT IOError (StateT (Int, Int, Int) IO)
 
 -- | 'StdinClock' lifted to our application monad.
@@ -39,9 +34,9 @@ type StdinWithEOF = HoistClock IO App StdinClock
 stdinWithEOF :: StdinWithEOF
 stdinWithEOF =
   HoistClock
-    { unhoistedClock = StdinClock
-    , -- Puzzle: Catch the exception, then hoist to both StateT and ExceptT.
-      monadMorphism = _
+    { unhoistedClock = StdinClock,
+      -- Puzzle: Catch the exception, then hoist to both StateT and ExceptT.
+      monadMorphism = ExceptT . lift . Exception.try
       -- Hint: You need the following ingredients: ExceptT, lift, Exception.try
     }
 
@@ -57,7 +52,7 @@ putAllCounts = proc () -> do
   totalWordCount <- sumN -< wordCount
   totalCharCount <- sumN -< charCount
   -- Instead of returning the counts, store them in the StateT monad!
-  _ -< _
+  arrMCl (lift . put) -< (lineCount, totalWordCount, totalCharCount)
 
 -- | Print the three counts.
 printCounts :: ClSF App StdinWithEOF (Int, Int, Int) ()
@@ -69,7 +64,7 @@ printCounts = proc (lineCount, totalWordCount, totalCharCount) -> do
 -- | On every 1000th line, print the number of total lines, words and characters so far.
 printAllCounts :: ClSF App StdinWithEOF () ()
 printAllCounts = proc () -> do
-  counts@(lineCount, _, _) <- constMCl _ -< ()
+  counts@(lineCount, _, _) <- constMCl (lift get) -< ()
   if lineCount `mod` 1000 == 0
     then printCounts -< counts
     else returnA -< ()
@@ -82,5 +77,5 @@ main = do
         -- Don't worry about the ambiguous type here, it will vanish as soon as you solve the following hole.
         flow $
           -- Something of type ClSF App StdinWithEOF () () should go here, but what?
-          _ @@ stdinWithEOF
+          putAllCounts >-> printAllCounts @@ stdinWithEOF
   putStrLn $ "The following output: " ++ show result
